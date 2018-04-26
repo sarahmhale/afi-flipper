@@ -1,19 +1,58 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const { graphqlExpress, graphiqlExpress } = require('apollo-server-express');
-const { makeExecutableSchema } = require('graphql-tools');
-import {schema} from './schema'
+import {
+  makeRemoteExecutableSchema,
+  mergeSchemas,
+  introspectSchema
+} from 'graphql-tools';
+import 'babel-polyfill';
+import { HttpLink } from 'apollo-link-http';
+import fetch from 'node-fetch';
 
-// Initialize the app
-const app = express();
+const setUpRemoteSchemas = async() => {
+  const link = new HttpLink({ uri: 'http://127.0.0.1:4000/afi-subscribers', fetch });
 
-// The GraphQL endpoint
-app.use('/graphql', bodyParser.json(), graphqlExpress({ schema }));
+  let schema = await introspectSchema(link);
 
-// GraphiQL, a visual editor for queries
-app.use('/graphiql', graphiqlExpress({ endpointURL: '/graphql' }));
+  const subscriberSchema = makeRemoteExecutableSchema({
+    schema,
+    link,
+  });
 
-// Start the server
-app.listen(3000, () => {
-  console.log('Go to http://localhost:3000/graphiql to run queries!');
-});
+  // const link = new HttpLink({ uri: 'http://api.githunt.com/graphql', fetch });
+  //
+  // const schema = await introspectSchema(link);
+  //
+  // const executableSchema = makeRemoteExecutableSchema({
+  //   schema,
+  //   link,
+  // });
+
+
+  const executableSchema = mergeSchemas({
+    schemas: [
+      subscriberSchema,
+    ],
+  });
+
+  // Initialize the app
+  const app = express();
+
+  // The GraphQL endpoint
+  app.use('/graphql', bodyParser.json(), graphqlExpress({ schema: executableSchema }));
+
+  // GraphiQL, a visual editor for queries
+  app.use('/graphiql', graphiqlExpress({ endpointURL: '/graphql' }));
+  // Start the server
+  app.listen(3000, () => {
+    console.log('Go to http://localhost:3000/graphiql to run queries!');
+  });
+
+}
+
+try {
+    setUpRemoteSchemas();
+} catch (e) {
+    console.log(e, e.message, e.stack);
+}

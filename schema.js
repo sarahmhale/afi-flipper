@@ -1,48 +1,36 @@
 import {
-  makeExecutableSchema,
-  addMockFunctionsToSchema,
+  makeRemoteExecutableSchema,
   mergeSchemas,
+  introspectSchema
 } from 'graphql-tools';
+import 'babel-polyfill';
+import { HttpLink } from 'apollo-link-http';
+import fetch from 'node-fetch';
 
-// Mocked chirp schema
-// We don't worry about the schema implementation right now since we're just
-// demonstrating schema stitching.
-const chirpSchema = makeExecutableSchema({
-  typeDefs: `
-    type Chirp {
-      id: ID!
-      text: String
-      authorId: ID!
-    }
+export const setUpRemoteSchemas = async() => {
+  const link = new HttpLink({ uri: 'http://127.0.0.1:4000/afi-subscribers', fetch });
 
-    type Query {
-      chirpById(id: ID!): Chirp
-      chirpsByAuthorId(authorId: ID!): [Chirp]
-    }
-  `
-});
+  let schema = await introspectSchema(link);
 
-addMockFunctionsToSchema({ schema: chirpSchema });
+  const subscriberSchema = makeRemoteExecutableSchema({
+    schema,
+    link,
+  });
 
-// Mocked author schema
-const authorSchema = makeExecutableSchema({
-  typeDefs: `
-    type User {
-      id: ID!
-      email: String
-    }
+  // const link = new HttpLink({ uri: 'http://api.githunt.com/graphql', fetch });
+  //
+  // const schema = await introspectSchema(link);
+  //
+  // const executableSchema = makeRemoteExecutableSchema({
+  //   schema,
+  //   link,
+  // });
 
-    type Query {
-      userById(id: ID!): User
-    }
-  `
-});
 
-addMockFunctionsToSchema({ schema: authorSchema });
+  const executableSchema = mergeSchemas({
+    schemas: [
+      subscriberSchema,
+    ],
+  });
 
-export const schema = mergeSchemas({
-  schemas: [
-    chirpSchema,
-    authorSchema,
-  ],
-});
+}
