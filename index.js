@@ -9,30 +9,32 @@ import {
 import 'babel-polyfill';
 import { HttpLink } from 'apollo-link-http';
 import fetch from 'node-fetch';
+const cors = require('cors')
 
 const setUpRemoteSchemas = async() => {
-  const link = new HttpLink({ uri: 'http://127.0.0.1:4000/afi-subscribers', fetch });
+  const sublink = new HttpLink({ uri: 'http://127.0.0.1:4000/afi-subscribers', fetch });
 
-  let schema = await introspectSchema(link);
+  let schema = await introspectSchema(sublink);
 
   const subscriberSchema = makeRemoteExecutableSchema({
     schema,
-    link,
+    sublink,
   });
 
-  // const link = new HttpLink({ uri: 'http://api.githunt.com/graphql', fetch });
-  //
-  // const schema = await introspectSchema(link);
-  //
-  // const executableSchema = makeRemoteExecutableSchema({
-  //   schema,
-  //   link,
-  // });
+  const adlink = new HttpLink({ uri: 'http://130.239.222.39:3000/graphql', fetch });
+
+  schema = await introspectSchema(adlink);
+
+  const adsSchema = makeRemoteExecutableSchema({
+    schema,
+    adlink,
+  });
 
 
   const executableSchema = mergeSchemas({
     schemas: [
       subscriberSchema,
+      adsSchema,
     ],
   });
 
@@ -40,7 +42,7 @@ const setUpRemoteSchemas = async() => {
   const app = express();
 
   // The GraphQL endpoint
-  app.use('/graphql', bodyParser.json(), graphqlExpress({ schema: executableSchema }));
+  app.use('/graphql', bodyParser.json(), cors(), graphqlExpress({ schema: executableSchema }));
 
   // GraphiQL, a visual editor for queries
   app.use('/graphiql', graphiqlExpress({ endpointURL: '/graphql' }));
@@ -52,7 +54,7 @@ const setUpRemoteSchemas = async() => {
 }
 
 try {
-    setUpRemoteSchemas();
+  setUpRemoteSchemas();
 } catch (e) {
-    console.log(e, e.message, e.stack);
+  console.log(e, e.message, e.stack);
 }
